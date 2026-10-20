@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.json">
+<title>Поиск по интернету</title>
+<style>
+  :root {
+    --bg: #ffffff; --text: #1c1e21; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #1a56db; --link: #1a0dab; --url: #188038; --error: #b00020;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --text: #e8eaed; --muted: #9aa0a6; --line: #2a2d33;
+      --accent: #6ea0ff; --link: #8ab4f8; --url: #81c995; --error: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  main { max-width: 680px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 8px 0 16px; }
+  form { display: flex; gap: 8px; position: sticky; top: 0; background: var(--bg);
+    padding: 8px 0 12px; }
+  input { flex: 1; min-width: 0; height: 46px; padding: 0 14px; font-size: 16px;
+    color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; }
+  input:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { height: 46px; padding: 0 18px; font-size: 16px; font-weight: 600;
+    color: #fff; background: var(--accent); border: 0; border-radius: 10px; }
+  @media (prefers-color-scheme: dark) { button { color: #0b1220; } }
+  .item { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .title { font-size: 17px; font-weight: 600; color: var(--link); text-decoration: none; }
+  .url { font-size: 13px; color: var(--url); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; margin-top: 2px; }
+  .snippet { font-size: 14px; margin-top: 4px; }
+  .source { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .status { color: var(--muted); text-align: center; margin-top: 32px; }
+  .status.error { color: var(--error); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Поиск по интернету</h1>
+  <form id="form">
+    <input id="q" type="search" placeholder="Что найти?" autocomplete="off" enterkeyhint="search" aria-label="Поисковый запрос">
+    <button type="submit">Найти</button>
+  </form>
+  <div id="status" class="status">Введите запрос и нажмите «Найти»</div>
+  <div id="results"></div>
+</main>
+<script>
+  const form = document.getElementById("form");
+  const input = document.getElementById("q");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = "status" + (isError ? " error" : "");
+    statusEl.hidden = !text;
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
+
+  function render(items) {
+    resultsEl.replaceChildren();
+    for (const it of items) {
+      if (!/^https?:\/\//i.test(it.url)) continue;
+      const box = el("div", "item");
+      const a = el("a", "title", it.title || it.url);
+      a.href = it.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      box.append(a, el("div", "url", it.url), el("div", "snippet", it.snippet),
+        el("div", "source", it.source));
+      resultsEl.append(box);
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    input.blur();
+    resultsEl.replaceChildren();
+    setStatus("Ищем…");
+    try {
+      const r = await fetch("/search?q=" + encodeURIComponent(q));
+      if (!r.ok) throw new Error("Ошибка сервера: " + r.status);
+      const data = await r.json();
+      if (!data.results.length) { setStatus("Ничего не найдено"); return; }
+      setStatus("");
+      render(data.results);
+    } catch (err) {
+      setStatus("Не удалось выполнить поиск. Попробуйте ещё раз. (" + err.message + ")", true);
+    }
+  });
+</script>
+</body>
+</html>
